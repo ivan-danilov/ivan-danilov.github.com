@@ -14,28 +14,26 @@ Let me describe briefly how COM components could be consumed from the .NET world
 
 Native COM interface description language is IDL - Microsoft flavor of Interface Definition Language. It resembles C header file. For example, here is excerpt from UIAutomationCore.idl (you can find it in the Windows SDK):
 
-```
-//
-//  IRawElementProviderSimple
-//
-[object, uuid(d6dd68d1-86fd-4332-8666-9abedea2d24c), pointer_default(unique)]
-interface IRawElementProviderSimple : IUnknown
-{
-    [propget] HRESULT ProviderOptions (
-        [out, retval] enum ProviderOptions * pRetVal );
-
-    HRESULT GetPatternProvider (
-        [in] PATTERNID patternId,
-        [out, retval] IUnknown ** pRetVal );
-
-    HRESULT GetPropertyValue (
-        [in] PROPERTYID propertyId,
-        [out, retval] VARIANT * pRetVal );
-
-    [propget] HRESULT HostRawElementProvider (
-        [out, retval] IRawElementProviderSimple ** pRetVal );
-}
-```
+    //
+    //  IRawElementProviderSimple
+    //
+    [object, uuid(d6dd68d1-86fd-4332-8666-9abedea2d24c), pointer_default(unique)]
+    interface IRawElementProviderSimple : IUnknown
+    {
+        [propget] HRESULT ProviderOptions (
+            [out, retval] enum ProviderOptions * pRetVal );
+    
+        HRESULT GetPatternProvider (
+            [in] PATTERNID patternId,
+            [out, retval] IUnknown ** pRetVal );
+    
+        HRESULT GetPropertyValue (
+            [in] PROPERTYID propertyId,
+            [out, retval] VARIANT * pRetVal );
+    
+        [propget] HRESULT HostRawElementProvider (
+            [out, retval] IRawElementProviderSimple ** pRetVal );
+    }
 
 Now, we can take that interface and write our own wrapper interface, decorate it with `ComVisible`, `InterfaceType` and `GUID` attributes, so that .NET runtime/marshaler is able to consume it and create CCW/RCW correctly. But it is tedious and error-prone (hey, there's not a single interface!). If you're interested, [here](http://blog.kutulu.org/2012/01/com-interop-part-10-recapping-and.html) is the marvelous introduction how to write managed wrappers for COM. It is very brief - just 10 posts ;)  
 
@@ -46,7 +44,8 @@ In principle, it is simple: we take UIAutomationCore.idl, pass it through midl.e
 But, there's some problems. It does not always make translation correctly, because IDL doesn't provide all required information. For example, function may take pointer and integer, and tlbimp.exe has no way to know that is it C-style array where pointer points to first element of an array, and integer denotes array size. For such cases there's separate [page](http://msdn.microsoft.com/en-us/library/ek1fb3c6%28v=vs.110%29.aspx) exists.
 
 So, in order to get better results, we have to change result of tlbimp.exe a bit. How? First, ildasm.exe, then change as needed and then ilasm.exe results back. That's precisely the steps made by [these CustomBuild actions](https://github.com/ivan-danilov/uia-custom-pattern-managed/blob/master/UiaCoreInterop/UIACoreInterop.vcxproj#L39):
-1. IDL -> midl -> TLB
+
+1. IDL -> midl -> TLB 
 2. TLB -> tlbimp -> managed DLL
 3. managed DLL -> ildasm -> IL code
 4. IL code -> our console project that just plainly replaces certain parts of IL code -> modified IL
